@@ -18,7 +18,7 @@ Describe your data pipeline in plain English. Get a validated, production-ready 
                               ↓  Claude AI
 { "name": "CopyBillingToBlob_Weekly", "properties": { "activities": [...], "triggers": [...] } }
                               ↓  Python + GitPython
-             Git commit → GitHub push → GitHub Actions → ADF deployed ✅
+             Git commit → GitHub push → GitHub Actions → ADF deployed
 ```
 
 ---
