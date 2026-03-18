@@ -1,0 +1,165 @@
+# .github/workflows/deploy-adf.yml
+# ---------------------------------
+# Triggers whenever a JSON file is pushed to the adf-configs branch
+# inside the configs/ directory.
+# Deploys each changed pipeline to Azure Data Factory via Azure CLI.
+
+name: Deploy ADF Pipelines
+
+on:
+  push:
+    branches:
+      - adf-configs
+    paths:
+      - "configs/**.json"
+
+jobs:
+  validate-and-deploy:
+    name: Validate & Deploy to Azure Data Factory
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # Need parent commit to detect changed files
+
+      # ── 2. Set up Python ──────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: |
+          cd scripts
+          pip install -r requirements.txt
+
+      # ── 3. Detect changed pipeline files ─────────────────────────────────
+      - name: Detect changed ADF config files
+        id: changed-files
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'configs/*.json' | tr '\n' ' ')
+          echo "files=$CHANGED" >> $GITHUB_OUTPUT
+          echo "Found changed files: $CHANGED"
+          if [ -z "$CHANGED" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      # ── 4. Validate all changed JSONs ─────────────────────────────────────
+      - name: Validate pipeline schemas
+        if: steps.changed-files.outputs.has_changes == 'true'
+        run: |
+          cd scripts
+          FAILED=0
+          for f in ${{ steps.changed-files.outputs.files }}; do
+            echo "Validating $f..."
+            python validate_config.py "../$f" || FAILED=1
+          done
+          if [ $FAILED -ne 0 ]; then
+            echo "::error::One or more pipeline configs failed validation."
+            exit 1
+          fi
+
+      # ── 5. Log in to Azure ───────────────────────────────────────────────
+      - name: Azure Login (Service Principal)
+        if: steps.changed-files.outputs.has_changes == 'true'
+        uses: azure/login@v2
+        with:
+          creds: |
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      # ── 6. Deploy each changed pipeline ──────────────────────────────────
+      - name: Deploy pipelines to ADF
+        if: steps.changed-files.outputs.has_changes == 'true'
+        env:
+          ADF_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          ADF_NAME: ${{ secrets.AZURE_DATA_FACTORY_NAME }}
+        run: |
+          DEPLOYED=()
+          FAILED=()
+
+          for f in ${{ steps.changed-files.outputs.files }}; do
+            PIPELINE_NAME=$(python3 -c "import json,sys; d=json.load(open('$f')); print(d['name'])")
+            echo "Deploying pipeline: $PIPELINE_NAME from $f"
+
+            az datafactory pipeline create-or-update \
+              --resource-group "$ADF_RG" \
+              --factory-name "$ADF_NAME" \
+              --name "$PIPELINE_NAME" \
+              --pipeline "@$f" \
+              && DEPLOYED+=("$PIPELINE_NAME") \
+              || FAILED+=("$PIPELINE_NAME")
+          done
+
+          echo ""
+          echo "=== Deployment Summary ==="
+          echo "Deployed: ${DEPLOYED[*]:-none}"
+          echo "Failed:   ${FAILED[*]:-none}"
+
+          if [ ${#FAILED[@]} -gt 0 ]; then
+            echo "::error::Failed to deploy: ${FAILED[*]}"
+            exit 1
+          fi
+
+      # ── 7. Deploy triggers ────────────────────────────────────────────────
+      - name: Deploy triggers to ADF
+        if: steps.changed-files.outputs.has_changes == 'true'
+        env:
+          ADF_RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          ADF_NAME: ${{ secrets.AZURE_DATA_FACTORY_NAME }}
+        run: |
+          for f in ${{ steps.changed-files.outputs.files }}; do
+            TRIGGERS=$(python3 -c "
+          import json, sys
+          d = json.load(open('$f'))
+          triggers = d.get('triggers', [])
+          for t in triggers:
+              print(json.dumps({'name': t['name'], 'type': t['type'], 'properties': t['properties']}))
+            ")
+            while IFS= read -r trigger_json; do
+              if [ -n "$trigger_json" ]; then
+                TRIGGER_NAME=$(echo "$trigger_json" | python3 -c "import json,sys; print(json.load(sys.stdin)['name'])")
+                echo "$trigger_json" > /tmp/trigger.json
+                echo "Deploying trigger: $TRIGGER_NAME"
+                az datafactory trigger create-or-update \
+                  --resource-group "$ADF_RG" \
+                  --factory-name "$ADF_NAME" \
+                  --name "$TRIGGER_NAME" \
+                  --properties "@/tmp/trigger.json" || true
+              fi
+            done <<< "$TRIGGERS"
+          done
+
+      # ── 8. Post deployment summary ────────────────────────────────────────
+      - name: Post deployment summary
+        if: always() && steps.changed-files.outputs.has_changes == 'true'
+        run: |
+          echo "### 🔷 ADF Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          for f in ${{ steps.changed-files.outputs.files }}; do
+            PIPELINE=$(python3 -c "import json; d=json.load(open('$f')); print(d.get('name','unknown'))" 2>/dev/null || echo "unknown")
+            echo "| \`$PIPELINE\` | ✅ Deployed |" >> $GITHUB_STEP_SUMMARY
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Factory: \`${{ secrets.AZURE_DATA_FACTORY_NAME }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Resource Group: \`${{ secrets.AZURE_RESOURCE_GROUP }}\`" >> $GITHUB_STEP_SUMMARY
+
+      # ── 9. Azure Logout ───────────────────────────────────────────────────
+      - name: Azure Logout
+        if: always()
+        run: az logout || true

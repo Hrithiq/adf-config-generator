@@ -1,0 +1,242 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/your-username/adf-config-generator/schemas/adf_pipeline_schema.json",
+  "title": "Azure Data Factory Copy Pipeline",
+  "description": "JSON Schema for ADF Copy Activity pipeline configuration (ADF v2)",
+  "type": "object",
+  "required": ["name", "properties"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "The name of the ADF pipeline",
+      "minLength": 1,
+      "maxLength": 140,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "properties": {
+      "type": "object",
+      "required": ["activities"],
+      "properties": {
+        "description": { "type": "string" },
+        "activities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "typeProperties"],
+            "properties": {
+              "name": { "type": "string" },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "Copy", "ExecutePipeline", "ForEach", "IfCondition", "Wait",
+                  "WebActivity", "Lookup", "GetMetadata", "Delete",
+                  "AzureFunctionActivity", "DatabricksNotebook", "HDInsightHive",
+                  "DataFlow", "SynapseNotebook"
+                ]
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["activity", "dependencyConditions"],
+                  "properties": {
+                    "activity": { "type": "string" },
+                    "dependencyConditions": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["Succeeded", "Failed", "Skipped", "Completed"]
+                      }
+                    }
+                  }
+                }
+              },
+              "policy": {
+                "type": "object",
+                "properties": {
+                  "timeout": { "type": "string", "pattern": "^\\d+\\.\\d{2}:\\d{2}:\\d{2}$" },
+                  "retry": { "type": "integer", "minimum": 0, "maximum": 10 },
+                  "retryIntervalInSeconds": { "type": "integer", "minimum": 30 },
+                  "secureOutput": { "type": "boolean" },
+                  "secureInput": { "type": "boolean" }
+                }
+              },
+              "userProperties": { "type": "array" },
+              "typeProperties": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "object",
+                    "required": ["type"],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "examples": [
+                          "AzureSqlSource", "SqlServerSource", "AzureMySqlSource",
+                          "CosmosDbSqlApiSource", "BlobSource", "DelimitedTextSource",
+                          "ParquetSource", "JsonSource", "AzureDataLakeStoreSource",
+                          "AzureBlobFSSource", "RestSource", "HttpSource",
+                          "OracleSource", "PostgreSqlSource", "SalesforceSource"
+                        ]
+                      },
+                      "sqlReaderQuery": { "type": "string" },
+                      "queryTimeout": { "type": "string" },
+                      "partitionOption": { "type": "string" }
+                    }
+                  },
+                  "sink": {
+                    "type": "object",
+                    "required": ["type"],
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "examples": [
+                          "AzureSqlSink", "BlobSink", "DelimitedTextSink",
+                          "ParquetSink", "JsonSink", "AzureDataLakeStoreSink",
+                          "AzureBlobFSSink", "CosmosDbSqlApiSink", "OracleSink"
+                        ]
+                      },
+                      "writeBehavior": { "type": "string" },
+                      "copyBehavior": {
+                        "type": "string",
+                        "enum": ["PreserveHierarchy", "FlattenHierarchy", "MergeFiles"]
+                      },
+                      "storeSettings": { "type": "object" },
+                      "formatSettings": { "type": "object" }
+                    }
+                  },
+                  "enableStaging": { "type": "boolean" },
+                  "translator": {
+                    "type": "object",
+                    "properties": {
+                      "type": { "type": "string", "enum": ["TabularTranslator"] },
+                      "mappings": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "source": { "type": "object" },
+                            "sink": { "type": "object" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "inputs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["referenceName", "type"],
+                  "properties": {
+                    "referenceName": { "type": "string" },
+                    "type": { "type": "string", "enum": ["DatasetReference"] },
+                    "parameters": { "type": "object" }
+                  }
+                }
+              },
+              "outputs": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["referenceName", "type"],
+                  "properties": {
+                    "referenceName": { "type": "string" },
+                    "type": { "type": "string", "enum": ["DatasetReference"] },
+                    "parameters": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["String", "Int", "Float", "Bool", "Array", "Object", "SecureString"] },
+              "defaultValue": {}
+            }
+          }
+        },
+        "variables": { "type": "object" },
+        "annotations": { "type": "array" },
+        "folder": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" }
+          }
+        }
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "properties"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": {
+            "type": "string",
+            "enum": ["ScheduleTrigger", "TumblingWindowTrigger", "BlobEventsTrigger", "CustomEventsTrigger"]
+          },
+          "properties": {
+            "type": "object",
+            "properties": {
+              "recurrence": {
+                "type": "object",
+                "required": ["frequency", "interval"],
+                "properties": {
+                  "frequency": {
+                    "type": "string",
+                    "enum": ["Minute", "Hour", "Day", "Week", "Month"]
+                  },
+                  "interval": { "type": "integer", "minimum": 1 },
+                  "startTime": { "type": "string" },
+                  "endTime": { "type": "string" },
+                  "timeZone": { "type": "string" },
+                  "schedule": {
+                    "type": "object",
+                    "properties": {
+                      "hours": { "type": "array", "items": { "type": "integer" } },
+                      "minutes": { "type": "array", "items": { "type": "integer" } },
+                      "weekDays": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+                        }
+                      },
+                      "monthDays": { "type": "array", "items": { "type": "integer" } }
+                    }
+                  }
+                }
+              },
+              "pipelines": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "pipelineReference": {
+                      "type": "object",
+                      "required": ["referenceName", "type"],
+                      "properties": {
+                        "referenceName": { "type": "string" },
+                        "type": { "type": "string", "enum": ["PipelineReference"] }
+                      }
+                    },
+                    "parameters": { "type": "object" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
