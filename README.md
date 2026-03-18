@@ -1,4 +1,4 @@
-# 🔷 ADF Config Generator
+# ADF Config Generator
 
 > **Natural language → production-ready Azure Data Factory JSON pipelines, automatically committed to Git and deployed to Azure.**
 
@@ -9,7 +9,7 @@
 
 ---
 
-## 📌 What This Does
+## What This Does
 
 Describe your data pipeline in plain English. Get a validated, production-ready Azure Data Factory (ADF) `Copy Activity` JSON config — automatically committed to GitHub and deployed to your Data Factory instance via CI/CD.
 
@@ -23,7 +23,7 @@ Describe your data pipeline in plain English. Get a validated, production-ready 
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌────────────────────────────────────────────────────┐
@@ -49,7 +49,7 @@ Describe your data pipeline in plain English. Get a validated, production-ready 
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 adf-config-generator/
@@ -85,7 +85,7 @@ adf-config-generator/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -146,7 +146,7 @@ This will: call Claude → validate JSON → save to `configs/` → git commit &
 
 ---
 
-## 🎨 Frontend Features
+## Frontend Features
 
 - Natural language input with keyboard shortcut (`⌘ Enter`)
 - Quick-start example prompts
@@ -165,7 +165,7 @@ This will: call Claude → validate JSON → save to `configs/` → git commit &
 
 ---
 
-## 🐍 Python Scripts
+## Python Scripts
 
 ```bash
 # Generate + validate + push
@@ -180,7 +180,7 @@ python git_push.py ../configs/MyPipeline.json
 
 ---
 
-## ⚙️ CI/CD (GitHub Actions)
+## CI/CD (GitHub Actions)
 
 On every push to `adf-configs` branch that touches `configs/*.json`:
 
@@ -191,7 +191,7 @@ On every push to `adf-configs` branch that touches `configs/*.json`:
 
 ---
 
-## 🔒 Security Notes
+## Security Notes
 
 - Never commit `.env` or API keys
 - In production, proxy the `ANTHROPIC_API_KEY` server-side
@@ -200,7 +200,7 @@ On every push to `adf-configs` branch that touches `configs/*.json`:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork → feature branch → PR
 2. Follow [Conventional Commits](https://www.conventionalcommits.org/)
